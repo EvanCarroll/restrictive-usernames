@@ -29,6 +29,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 env:
   IMAGE_NAME: ghcr.io/evancarroll/pg-restrictive-usernames
 
@@ -65,7 +69,12 @@ jobs:
         if: inputs.push
         run: |
           set -euo pipefail
-          buildah login -u "${{ github.actor }}" --password-stdin ghcr.io <<< "${{ secrets.GITHUB_TOKEN }}"
+          # Retried: a runner's DNS has failed this lookup once.
+          for i in 1 2 3 4 5; do
+            buildah login -u "${{ github.actor }}" --password-stdin ghcr.io <<< "${{ secrets.GITHUB_TOKEN }}" && break
+            [ "$i" = 5 ] && exit 1
+            sleep $((i * 10))
+          done
           container/push-images.sh arch "${{ inputs.prefix }}"
 
   manifest:
@@ -92,11 +101,21 @@ jobs:
         id: manifest
         run: |
           set -euo pipefail
-          buildah login -u "${{ github.actor }}" --password-stdin ghcr.io <<< "${{ secrets.GITHUB_TOKEN }}"
+          # Retried: a runner's DNS has failed this lookup once.
+          for i in 1 2 3 4 5; do
+            buildah login -u "${{ github.actor }}" --password-stdin ghcr.io <<< "${{ secrets.GITHUB_TOKEN }}" && break
+            [ "$i" = 5 ] && exit 1
+            sleep $((i * 10))
+          done
           tags=("${{ inputs.prefix }}")
           if [ "${{ inputs.moving }}" = true ]; then tags+=(""); fi
           container/push-images.sh manifest "${{ inputs.prefix }}" "${tags[@]}" > digests.txt
           cat digests.txt
+      # cosign-installer and download-syft run shell steps that need
+      # envsubst (gettext), which the buildah image does not ship.
+      - name: Signing prerequisites
+        if: inputs.sign
+        run: dnf -y -q install gettext
       - uses: sigstore/cosign-installer@v4.1.2
         if: inputs.sign
       - uses: anchore/sbom-action/download-syft@v0
