@@ -1,0 +1,33 @@
+[package]
+name = "pg_restrictive_usernames"
+description = "PostgreSQL extension: Unicode username / nickname policy and confusable-skeleton keys"
+license = "PostgreSQL"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version = "1.96"
+# Distributed as an extension (images, PGXN), not on crates.io: it is a
+# cdylib built by cargo pgrx against one PostgreSQL major's headers.
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+# One feature per supported major; PostgreSQL 13 is past end of life.
+default = ["pg18"]
+pg14 = ["pgrx/pg14", "pgrx-tests/pg14"]
+pg15 = ["pgrx/pg15", "pgrx-tests/pg15"]
+pg16 = ["pgrx/pg16", "pgrx-tests/pg16"]
+pg17 = ["pgrx/pg17", "pgrx-tests/pg17"]
+pg18 = ["pgrx/pg18", "pgrx-tests/pg18"]
+pg_test = []
+
+[dependencies]
+pgrx = "0.19"
+restrictive-usernames = { path = "../restrictive-usernames", features = ["check", "corpus"] }
+
+[dev-dependencies]
+pgrx-tests = "0.19"

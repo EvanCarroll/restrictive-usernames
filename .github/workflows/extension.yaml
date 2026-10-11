@@ -1,0 +1,117 @@
+# Build, test and (optionally) publish the extension images for every
+# supported PostgreSQL major on amd64 and arm64. Called by ci.yaml (edge
+# images from main) and release.yaml (versioned, signed images).
+#
+# One native runner per architecture: pgrx needs the target's server
+# headers and `cargo pgrx test` runs a cluster, so there is no cross build.
+name: Extension
+
+on:
+  workflow_call:
+    inputs:
+      push:
+        description: push the images and join them into multi-arch manifests
+        type: boolean
+        default: false
+      prefix:
+        description: tag prefix, e.g. "edge-" or "0.5.0-"
+        type: string
+        default: edge-
+      moving:
+        description: also tag the manifests without the prefix (pg18, pg18-cnpg, ...)
+        type: boolean
+        default: false
+      sign:
+        description: sign the manifests with cosign and attach SPDX SBOMs
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/evancarroll/pg-restrictive-usernames
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: [14, 15, 16, 17, 18]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: quay.io/buildah/stable:latest
+      options: --privileged
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PG_MAJOR: ${{ matrix.pg }}
+      ARCH: ${{ matrix.arch }}
+      TAG_SUFFIX: -${{ matrix.arch }}
+      IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+      IMAGE_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and test (PostgreSQL ${{ matrix.pg }}, ${{ matrix.arch }})
+        run: container/build-extension.sh --test
+      - name: Push the ${{ matrix.arch }} images
+        if: inputs.push
+        run: |
+          set -euo pipefail
+          buildah login -u "${{ github.actor }}" --password-stdin ghcr.io <<< "${{ secrets.GITHUB_TOKEN }}"
+          container/push-images.sh arch "${{ inputs.prefix }}"
+
+  manifest:
+    if: inputs.push
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: [14, 15, 16, 17, 18]
+    runs-on: ubuntu-24.04
+    container:
+      image: quay.io/buildah/stable:latest
+      options: --privileged
+    permissions:
+      contents: read
+      packages: write
+      # cosign keyless signing: the certificate names this workflow run.
+      id-token: write
+    env:
+      PG_MAJOR: ${{ matrix.pg }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Join the architectures
+        id: manifest
+        run: |
+          set -euo pipefail
+          buildah login -u "${{ github.actor }}" --password-stdin ghcr.io <<< "${{ secrets.GITHUB_TOKEN }}"
+          tags=("${{ inputs.prefix }}")
+          if [ "${{ inputs.moving }}" = true ]; then tags+=(""); fi
+          container/push-images.sh manifest "${{ inputs.prefix }}" "${tags[@]}" > digests.txt
+          cat digests.txt
+      - uses: sigstore/cosign-installer@v4
+        if: inputs.sign
+      - uses: anchore/sbom-action/download-syft@v0
+        if: inputs.sign
+      - name: Sign and attest an SBOM for every manifest
+        if: inputs.sign
+        env:
+          SYFT_REGISTRY_AUTH_AUTHORITY: ghcr.io
+          SYFT_REGISTRY_AUTH_USERNAME: ${{ github.actor }}
+          SYFT_REGISTRY_AUTH_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cosign login ghcr.io -u "${{ github.actor }}" --password-stdin <<< "${{ secrets.GITHUB_TOKEN }}"
+          while read -r ref; do
+            cosign sign --yes "$ref"
+            syft scan "registry:${ref}" -o spdx-json=sbom.spdx.json
+            cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$ref"
+          done < digests.txt

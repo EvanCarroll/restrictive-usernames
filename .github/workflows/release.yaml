@@ -1,0 +1,200 @@
+# Publish a release from a v<version> tag: the crate to crates.io, both npm
+# packages, the signed extension images, the PGXN distribution, and a GitHub
+# release carrying the PGXN zip and the CHANGELOG entry.
+#
+# One-time setup (the first version of the crate and of each npm package is
+# published by hand; the jobs below skip a version that already exists):
+#   * crates.io: trusted publisher for restrictive-usernames, this
+#     repository, workflow release.yaml, environment release.
+#   * npm: trusted publisher for restrictive-usernames and
+#     restrictive-usernames-full, same repository and workflow.
+#   * secrets PGXN_USERNAME and PGXN_PASSWORD (a PGXN Manager account that
+#     owns pg_restrictive_usernames).
+#   * an environment named release, ideally with required reviewers.
+#   * after the first push, make the ghcr.io package public.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag, the workspace, META.json and CHANGELOG.md agree
+        id: version
+        run: |
+          set -euo pipefail
+          v=$(cargo metadata --format-version 1 --no-deps \
+            | jq -er '[.packages[] | select(.name == "restrictive-usernames") | .version][0]')
+          [ "v${v}" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != workspace v${v}" >&2; exit 1; }
+          [ "$(jq -er .version META.json)" = "$v" ] || { echo "META.json version != ${v}" >&2; exit 1; }
+          grep -q "^## ${v} " CHANGELOG.md || { echo "CHANGELOG.md has no '## ${v} ' entry" >&2; exit 1; }
+          echo "version=${v}" >> "$GITHUB_OUTPUT"
+
+  # The whole CI suite, against the tagged commit.
+  ci:
+    needs: verify
+    uses: ./.github/workflows/ci.yaml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+  images:
+    needs: [verify, ci]
+    uses: ./.github/workflows/extension.yaml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      push: true
+      prefix: ${{ needs.verify.outputs.version }}-
+      moving: true
+      sign: true
+
+  crate:
+    needs: [verify, ci]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      # A version published by hand (the first release has to be: trusted
+      # publishing is configured on an existing crate) is skipped, so the
+      # rest of the release still runs.
+      - name: Already on crates.io?
+        id: published
+        run: |
+          set -euo pipefail
+          v="${{ needs.verify.outputs.version }}"
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -A "restrictive-usernames release (${{ github.server_url }}/${{ github.repository }})" \
+            "https://crates.io/api/v1/crates/restrictive-usernames/${v}")
+          case "$code" in
+            200) echo "skip=true" >> "$GITHUB_OUTPUT"; echo "restrictive-usernames ${v} is already published" ;;
+            404) echo "skip=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "crates.io answered HTTP ${code}" >&2; exit 1 ;;
+          esac
+      - uses: rust-lang/crates-io-auth-action@v1
+        if: steps.published.outputs.skip == 'false'
+        id: auth
+      - name: cargo publish
+        if: steps.published.outputs.skip == 'false'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish -p restrictive-usernames
+
+  npm:
+    needs: [verify, ci]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BINARYEN_VERSION: "133"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Toolchain, wasm-bindgen CLI, wasm-opt
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-unknown-unknown
+          v=$(cargo metadata --format-version 1 | jq -er '[.packages[] | select(.name == "wasm-bindgen") | .version] | unique | .[0]')
+          cargo install wasm-bindgen-cli --locked --version "$v"
+          curl -fsSL --retry 3 \
+            "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/binaryen-version_${BINARYEN_VERSION}/bin" >> "$GITHUB_PATH"
+      - name: Build and test both packages
+        run: crates/restrictive-usernames-wasm/build-npm.sh --test --pack
+      # Trusted publishing (OIDC): no token, provenance attached. A version
+      # already on npm (the first release is published by hand) is skipped.
+      - name: npm publish
+        run: |
+          set -euo pipefail
+          v="${{ needs.verify.outputs.version }}"
+          for pkg in restrictive-usernames restrictive-usernames-full; do
+            if [ "$(npm view "${pkg}@${v}" version 2>/dev/null || true)" = "$v" ]; then
+              echo "${pkg} ${v} is already published"
+              continue
+            fi
+            (cd "target/npm/${pkg}" && npm publish --provenance --access public)
+          done
+
+  pgxn:
+    needs: [verify, ci]
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # pgxn-bundle.sh reads the tag with git archive.
+          fetch-depth: 0
+      - name: Bundle
+        run: container/pgxn-bundle.sh "${GITHUB_REF_NAME}" --out out
+      - name: Upload to PGXN
+        env:
+          PGXN_USERNAME: ${{ secrets.PGXN_USERNAME }}
+          PGXN_PASSWORD: ${{ secrets.PGXN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          zip="out/pg_restrictive_usernames-${{ needs.verify.outputs.version }}.zip"
+          # As pgxn-tools' pgxn-release does it: the XMLHttpRequest header
+          # makes PGXN Manager answer 200 or an error instead of a redirect.
+          status=$(curl --silent --output /dev/stderr --write-out '%{http_code}' \
+            --user "${PGXN_USERNAME}:${PGXN_PASSWORD}" \
+            -H 'X-Requested-With: XMLHttpRequest' \
+            -F 'submit=Release It!' -F "archive=@${zip}" \
+            https://manager.pgxn.org/upload)
+          echo
+          [ "$status" = 200 ] || { echo "PGXN upload failed: HTTP ${status}" >&2; exit 1; }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pgxn
+          path: out/*.zip
+
+  github-release:
+    needs: [verify, images, crate, npm, pgxn]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: pgxn
+          path: out
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          v="${{ needs.verify.outputs.version }}"
+          # The CHANGELOG entry: from "## <v> " to the next "## ".
+          awk -v v="$v" '
+            index($0, "## " v " ") == 1 { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          gh release create "${GITHUB_REF_NAME}" out/*.zip \
+            --title "${GITHUB_REF_NAME}" --notes-file notes.md --verify-tag

@@ -1,0 +1,29 @@
+[package]
+name = "restrictive-usernames-wasm"
+description = "JavaScript bindings (wasm-bindgen) for restrictive-usernames, published to npm as restrictive-usernames and restrictive-usernames-full"
+license = "MIT"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+# Ships through npm (build-npm.sh), not crates.io.
+publish = false
+
+[lib]
+name = "restrictive_usernames_wasm"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# The full Unicode policy: npm package restrictive-usernames-full. Without
+# it the module is the structural check only: npm package
+# restrictive-usernames.
+check = ["restrictive-usernames/check"]
+
+[dependencies]
+restrictive-usernames = { path = "../restrictive-usernames", default-features = false }
+thiserror = "2"
+# Exact: the wasm-bindgen CLI that build-npm.sh runs must be this version.
+wasm-bindgen = "=0.2.129"
+js-sys = "0.3.106"

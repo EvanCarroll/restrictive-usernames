@@ -1,0 +1,13 @@
+-- pg_restrictive_usernames 0.4.0 -> 0.5.0
+--
+-- Policy 4 -> 5 (the rules live in the shared library, which the new image
+-- replaces). key_visual_ci() and key_visual_cs() now apply UAX #9 rule L3:
+-- a combining mark stays after its base in a right-to-left run. Their value
+-- changes for right-to-left names with marks, and pairs that display alike
+-- but were apart under policy 4 (U+0628 U+0626 U+0628 and U+0628 U+0649
+-- U+0654 U+0628) now collide: find and resolve those duplicates, then
+-- REINDEX every index built on key_visual_ci or key_visual_cs. check(),
+-- key_ci() and key_cs() are unchanged for every name.
+--
+-- No SQL change.
+\echo Use "ALTER EXTENSION pg_restrictive_usernames UPDATE TO '0.5.0'" to load this file. \quit

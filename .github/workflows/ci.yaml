@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  # release.yaml runs the whole suite against the tagged commit.
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    env:
+      # Lints and docs fail the build, not just the log.
+      RUSTFLAGS: -D warnings
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+      - name: rustfmt
+        run: |
+          cargo fmt --all --check
+          cargo fmt --manifest-path crates/restrictive-usernames/fuzz/Cargo.toml --check
+      # The pgrx crate needs PostgreSQL headers, which only the builder in
+      # the extension job has; that job builds and tests it.
+      - name: clippy (library and wasm bindings)
+        run: |
+          cargo clippy -p restrictive-usernames --all-targets --all-features
+          cargo clippy -p restrictive-usernames --all-targets --no-default-features
+          cargo clippy -p restrictive-usernames-wasm --all-targets --all-features
+      - name: rustdoc
+        run: cargo doc -p restrictive-usernames --no-deps --all-features
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-unknown-unknown
+      - name: Test with the Unicode policy
+        run: cargo test --all-features
+      - name: Test the vocabulary only
+        run: cargo test --no-default-features
+      - name: Test the wasm bindings on the host
+        run: cargo test -p restrictive-usernames-wasm --all-features
+      - name: Build the vocabulary for wasm32
+        run: cargo build -p restrictive-usernames --no-default-features --target wasm32-unknown-unknown
+      - name: Fuzz properties over the acceptance corpus
+        run: cargo test --manifest-path crates/restrictive-usernames/fuzz/Cargo.toml
+      - name: Package as crates.io would
+        run: cargo publish -p restrictive-usernames --dry-run
+
+  # rust-version in crates/restrictive-usernames/Cargo.toml. The resolver
+  # (resolver 3) picks dependency versions that support it.
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: rustup toolchain install 1.85 --profile minimal
+      - name: Test on the minimum supported Rust
+        run: |
+          cargo +1.85 test -p restrictive-usernames --all-features
+          cargo +1.85 test -p restrictive-usernames --no-default-features
+
+  npm:
+    runs-on: ubuntu-24.04
+    env:
+      BINARYEN_VERSION: "133"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Toolchain, wasm-bindgen CLI, wasm-opt
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-unknown-unknown
+          # The CLI must equal the wasm-bindgen crate (build-npm.sh checks).
+          v=$(cargo metadata --format-version 1 | jq -er '[.packages[] | select(.name == "wasm-bindgen") | .version] | unique | .[0]')
+          cargo install wasm-bindgen-cli --locked --version "$v"
+          curl -fsSL --retry 3 \
+            "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/binaryen-version_${BINARYEN_VERSION}/bin" >> "$GITHUB_PATH"
+      - name: Build, test and pack both packages
+        run: crates/restrictive-usernames-wasm/build-npm.sh --test --pack
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm
+          path: target/npm/
+
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Nightly toolchain and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install --locked cargo-fuzz
+      - name: Seed the corpus
+        working-directory: crates/restrictive-usernames/fuzz
+        run: cargo test -- --ignored write_seed_corpus
+      # A smoke run: one minute per target on every push. Longer campaigns
+      # run locally (README, "Fuzzing").
+      - name: Fuzz each target for 60 seconds
+        working-directory: crates/restrictive-usernames
+        run: |
+          set -euo pipefail
+          for target in $(cargo +nightly fuzz list); do
+            cargo +nightly fuzz run "$target" -- \
+              -dict=fuzz/unicode.dict -max_len=256 -max_total_time=60
+          done
+      - name: Upload crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-artifacts
+          path: crates/restrictive-usernames/fuzz/artifacts/
+
+  extension:
+    uses: ./.github/workflows/extension.yaml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      # Edge images from main: edge-pg18, edge-pg18-cnpg, ... (unsigned).
+      push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      prefix: edge-

@@ -1,0 +1,56 @@
+[package]
+name = "restrictive-usernames"
+description = "Unicode username / nickname policy: UTS #39 identifier profile, Highly Restrictive script mixing, confusable-skeleton keys in stored and displayed order"
+license = "MIT"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/restrictive-usernames"
+readme = "README.md"
+keywords = ["unicode", "username", "confusables", "uts39", "precis"]
+categories = ["text-processing", "internationalization", "authentication"]
+rust-version = "1.85"
+exclude = ["fuzz/"]
+
+[lib]
+name = "restrictive_usernames"
+
+[features]
+default = ["check"]
+# The full Unicode policy. Without it the crate is vocabulary (Rule, Kind,
+# Policy, Rejected) plus the std-only structural check: serde + thiserror only,
+# which is what a wasm32 browser build takes.
+check = [
+    "dep:unicode-security",
+    "dep:unicode-normalization",
+    "dep:unicode-script",
+    "dep:unicode-ident",
+    "dep:caseless",
+    "dep:unicode-bidi",
+]
+# The acceptance corpus as pub const tables, shared with the pgrx tests.
+corpus = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+# Exact versions: the policy is a function of these crates' Unicode tables,
+# and a semver-compatible release that moves a table would change what
+# `check` accepts and what the keys return, so an application and the
+# database extension built a week apart would disagree about uniqueness.
+# `UNICODE_VERSION` names each one, and a compile-time assertion in lib.rs
+# refuses any other tables. Moving one is a POLICY_VERSION bump.
+unicode-security = { version = "=0.1.2", optional = true }
+unicode-normalization = { version = "=0.1.25", optional = true }
+unicode-script = { version = "=0.5.8", optional = true }
+unicode-ident = { version = "=1.0.26", optional = true }
+caseless = { version = "=0.2.2", optional = true }
+unicode-bidi = { version = "=0.3.18", optional = true }
+
+[dev-dependencies]
+serde_json = "1"
+
+[package.metadata.docs.rs]
+all-features = true

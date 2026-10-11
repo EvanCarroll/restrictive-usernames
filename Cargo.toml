@@ -1,0 +1,40 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/restrictive-usernames",
+    "crates/restrictive-usernames-wasm",
+    "crates/pg_restrictive_usernames",
+]
+# The pgrx crate needs `cargo pgrx init` and PostgreSQL server headers, which
+# only the builder container has (container/build-extension.sh). Plain
+# `cargo test` / `cargo clippy` at the root therefore cover the library only;
+# the extension is built and tested with `cargo pgrx` inside the builder.
+# The wasm crate ships through npm and is built for wasm32 by its own script
+# (crates/restrictive-usernames-wasm/build-npm.sh).
+default-members = ["crates/restrictive-usernames"]
+
+[workspace.package]
+edition = "2024"
+version = "0.5.0"
+authors = ["Evan Carroll <me@evancarroll.com>"]
+repository = "https://github.com/EvanCarroll/restrictive-usernames"
+homepage = "https://github.com/EvanCarroll/restrictive-usernames"
+
+# pgrx requires panic = "unwind": a Rust panic inside a SQL function is caught
+# at the FFI boundary and re-raised as a PostgreSQL ERROR.
+[profile.dev]
+panic = "unwind"
+
+[profile.release]
+panic = "unwind"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
+# The npm packages (crates/restrictive-usernames-wasm/build-npm.sh). Only
+# wasm32 builds select it, so panic = "abort" here never reaches pgrx; it
+# drops the unwinding machinery, and opt-level "z" trades speed for size.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+panic = "abort"

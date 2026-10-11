@@ -1,0 +1,12 @@
+comment = 'Unicode username, nickname and label policy (UTS #39 identifier profile, Highly Restrictive script mixing) and confusable-skeleton keys'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/pg_restrictive_usernames'
+relocatable = false
+schema = restrictive_usernames
+# Trusted: every function is IMMUTABLE and pure (no file, network or catalog
+# access, no state), so a non-superuser with CREATE on the database may
+# install it. The script still runs as the bootstrap superuser, which
+# superuser = true requires (LANGUAGE c functions need it); the schema it
+# creates is owned by the installing role.
+superuser = true
+trusted = true
