@@ -9,7 +9,8 @@
 #   * npm: trusted publisher for restrictive-usernames and
 #     restrictive-usernames-full, same repository and workflow.
 #   * secrets PGXN_USERNAME and PGXN_PASSWORD (a PGXN Manager account that
-#     owns pg_restrictive_usernames).
+#     owns pg_restrictive_usernames); without them the zip is built and
+#     attached to the GitHub release but not uploaded.
 #   * an environment named release, ideally with required reviewers.
 #   * after the first push, make the ghcr.io package public.
 name: Release
@@ -100,6 +101,8 @@ jobs:
         run: cargo publish -p restrictive-usernames
 
   npm:
+    # Disabled until the first manual publish / credentials exist (npm trusted publisher); remove this line to re-enable.
+    if: false
     needs: [verify, ci]
     runs-on: ubuntu-24.04
     environment: release
@@ -142,6 +145,8 @@ jobs:
           done
 
   pgxn:
+    # Disabled until the first manual publish / credentials exist (PGXN_USERNAME/PGXN_PASSWORD secrets); remove this line to re-enable.
+    if: false
     needs: [verify, ci]
     runs-on: ubuntu-24.04
     environment: release
@@ -159,6 +164,12 @@ jobs:
         run: |
           set -euo pipefail
           zip="out/pg_restrictive_usernames-${{ needs.verify.outputs.version }}.zip"
+          # No account yet: keep the zip (it is attached to the GitHub
+          # release) and upload it by hand later.
+          if [ -z "${PGXN_USERNAME}" ] || [ -z "${PGXN_PASSWORD}" ]; then
+            echo "::notice::PGXN_USERNAME / PGXN_PASSWORD not set; not uploading ${zip} to PGXN"
+            exit 0
+          fi
           # As pgxn-tools' pgxn-release does it: the XMLHttpRequest header
           # makes PGXN Manager answer 200 or an error instead of a redirect.
           status=$(curl --silent --output /dev/stderr --write-out '%{http_code}' \
@@ -174,13 +185,16 @@ jobs:
           path: out/*.zip
 
   github-release:
-    needs: [verify, images, crate, npm, pgxn]
+    # npm and pgxn are disabled above; add them back to needs when re-enabled.
+    needs: [verify, images, crate]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
+      # The pgxn job (disabled) produces this; absent, the release has no zip.
       - uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: pgxn
           path: out
@@ -196,5 +210,6 @@ jobs:
             on && /^## / { exit }
             on { print }
           ' CHANGELOG.md > notes.md
-          gh release create "${GITHUB_REF_NAME}" out/*.zip \
+          mkdir -p out
+          gh release create "${GITHUB_REF_NAME}" $(compgen -G 'out/*.zip' || true) \
             --title "${GITHUB_REF_NAME}" --notes-file notes.md --verify-tag

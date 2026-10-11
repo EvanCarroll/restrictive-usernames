@@ -116,6 +116,10 @@ jobs:
       - name: Signing prerequisites
         if: inputs.sign
         run: dnf -y -q install gettext
+      # cosign-installer shells out to envsubst, which the buildah image lacks.
+      - name: Install gettext (envsubst)
+        if: inputs.sign
+        run: dnf install -y gettext
       - uses: sigstore/cosign-installer@v4.1.2
         if: inputs.sign
       - uses: anchore/sbom-action/download-syft@v0
