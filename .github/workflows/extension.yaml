@@ -97,7 +97,7 @@ jobs:
           if [ "${{ inputs.moving }}" = true ]; then tags+=(""); fi
           container/push-images.sh manifest "${{ inputs.prefix }}" "${tags[@]}" > digests.txt
           cat digests.txt
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.2
         if: inputs.sign
       - uses: anchore/sbom-action/download-syft@v0
         if: inputs.sign

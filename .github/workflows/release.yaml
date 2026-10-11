@@ -90,7 +90,7 @@ jobs:
             404) echo "skip=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "crates.io answered HTTP ${code}" >&2; exit 1 ;;
           esac
-      - uses: rust-lang/crates-io-auth-action@v1
+      - uses: rust-lang/crates-io-auth-action@v1.0.5
         if: steps.published.outputs.skip == 'false'
         id: auth
       - name: cargo publish
