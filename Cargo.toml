@@ -4,6 +4,8 @@ members = [
     "crates/restrictive-usernames",
     "crates/restrictive-usernames-wasm",
     "crates/pg_restrictive_usernames",
+    "crates/opaque-string",
+    "crates/opaque-string-wasm",
 ]
 # The pgrx crate needs `cargo pgrx init` and PostgreSQL server headers, which
 # only the builder container has (container/build-extension.sh). Plain
@@ -11,7 +13,7 @@ members = [
 # the extension is built and tested with `cargo pgrx` inside the builder.
 # The wasm crate ships through npm and is built for wasm32 by its own script
 # (crates/restrictive-usernames-wasm/build-npm.sh).
-default-members = ["crates/restrictive-usernames"]
+default-members = ["crates/restrictive-usernames", "crates/opaque-string"]
 
 [workspace.package]
 edition = "2024"

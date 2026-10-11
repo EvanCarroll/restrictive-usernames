@@ -1,0 +1,36 @@
+[package]
+name = "opaque-string-wasm"
+description = "JavaScript bindings (wasm-bindgen) for opaque-string, published to npm as opaque-string"
+license = "MIT"
+# Must equal opaque-string's version (build-npm.sh checks).
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+# Ships through npm (build-npm.sh), not crates.io.
+publish = false
+
+[lib]
+name = "opaque_string_wasm"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# Compiled-in NFC tables instead of the engine's. Only for the reference
+# module build-npm.sh --test compares the engine against; never published.
+nfc-tables = ["opaque-string/nfc-tables"]
+
+[dependencies]
+opaque-string = { path = "../opaque-string", default-features = false, features = ["js"] }
+thiserror = "2"
+# Exact, and equal to restrictive-usernames-wasm's: build-npm.sh requires
+# one wasm-bindgen in the graph, matching the CLI.
+wasm-bindgen = "=0.2.129"
+js-sys = "0.3.106"
+
+# Host builds (cargo test on the workspace) have no JavaScript engine: give
+# them the compiled-in tables. wasm32 builds keep the engine's NFC only.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+opaque-string = { path = "../opaque-string", features = ["nfc-tables"] }
+

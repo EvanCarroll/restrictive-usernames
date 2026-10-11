@@ -1,0 +1,19 @@
+[package]
+name = "opaque-string-tablegen"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Generates crates/opaque-string/src/tables.rs from the Unicode Character Database"
+
+[dependencies]
+clap = { version = "4.6", features = ["derive"] }
+thiserror = "2"
+# Must equal the opaque-string pin: the table's Unicode version is asserted
+# against this crate's, and its decompositions decide the NFC-unstable set.
+unicode-normalization = "=0.1.25"
+
+# Not a member of the repository workspace: a maintenance tool, run by
+# regen.sh, never built by the workspace's CI matrix.
+[workspace]
+members = ["."]

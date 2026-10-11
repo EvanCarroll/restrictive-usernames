@@ -252,6 +252,21 @@ Build: `crates/restrictive-usernames-wasm/build-npm.sh --test --pack`
 (needs the wasm32 target, a wasm-bindgen CLI equal to the crate's version,
 wasm-opt, node and npm). The packages land in `target/npm/`.
 
+## Passwords: `opaque-string`
+
+`crates/opaque-string` is a separate crate, versioned on its own, that
+implements RFC 8265 §4.2 OpaqueString, the PRECIS profile for passwords.
+It makes the same password always become the same bytes before OPAQUE
+(RFC 9807) or a password hash: `enforce` at registration, `prepare` at
+login. The npm package `opaque-string` is the same code using the
+browser's own NFC (about 16 KB gzipped).
+
+It is not part of the PostgreSQL extension and never will be, because
+passwords must not reach SQL. See the
+[crate README](crates/opaque-string/README.md),
+[CONFORMANCE.md §8](CONFORMANCE.md#8-opaquestring-opaque-string-crate)
+and [PASSWORDS.md](PASSWORDS.md).
+
 ## Unicode versions
 
 | Table | Crate | Unicode |
@@ -409,6 +424,15 @@ A failure leaves its input in `fuzz/artifacts/<target>/`. Reproduce it with
 acceptance corpus (`src/corpus.rs`) once it is fixed. CI runs each target
 for 60 seconds on every push and uploads `fuzz/artifacts/` on failure.
 
+`crates/opaque-string/fuzz` does the same for the password crate, with
+targets `prepare` and `enforce`, dictionary `fuzz/opaque.dict`, and seeds
+from `crates/opaque-string/tests/corpus.json`. Its properties:
+- `prepare` is idempotent and returns NFC with no non-ASCII spaces;
+- `enforce(prepare(x)) == enforce(x)`;
+- an accepted password is a fixed point;
+- the first refused code point and the count are exact;
+- errors never contain the password.
+
 ### Extension
 
 `container/build-extension.sh` builds with buildah (no Containerfile):
@@ -526,6 +550,19 @@ corpus; the minimum Rust version (1.85); `cargo publish --dry-run`; the npm
 packages (`build-npm.sh --test --pack`); a one-minute fuzz run per target;
 and `build-extension.sh --test` for PostgreSQL 14 to 18 on amd64 and
 arm64. On `main` it pushes the `edge-*` images.
+
+It also calls `.github/workflows/opaque-string.yaml` for the password
+crate:
+- lint, tests (including the exhaustive and differential ones), MSRV and
+  `publish --dry-run`;
+- `tablegen/regen.sh --check`, which regenerates `src/tables.rs` from the
+  checksummed UCD and diffs it;
+- the npm package, with its 16 KiB gzip budget and the engine-versus-tables
+  NFC comparison;
+- a one-minute fuzz run per target.
+
+`.github/workflows/release-opaque-string.yaml` releases that crate from
+`opaque-string-v<version>` tags, independently of `v<version>`.
 
 `.github/workflows/release.yaml` runs on a `v<version>` tag that matches
 the workspace version. It publishes the crate to crates.io (trusted

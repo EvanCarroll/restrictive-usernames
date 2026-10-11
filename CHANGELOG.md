@@ -5,6 +5,9 @@ Every release names its extension version and its policy version
 independently. A policy bump means the REINDEX procedure in
 [UPGRADING.md](UPGRADING.md). Versions before 0.5.0 were not published.
 
+The password crate `opaque-string` is versioned and released separately;
+see [crates/opaque-string/CHANGELOG.md](crates/opaque-string/CHANGELOG.md).
+
 ## 0.5.0 (policy 5): first public release
 
 ### Fixed

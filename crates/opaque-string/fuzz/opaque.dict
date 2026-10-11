@@ -1,0 +1,100 @@
+# libFuzzer dictionary for the opaque-string fuzz targets.
+# Pass with -dict=fuzz/opaque.dict. Each entry is one code point as UTF-8,
+# named by its code point; one block per class the profile treats specially.
+
+# non-ASCII spaces the profile maps to U+0020, and separators it refuses
+u00A0="\xC2\xA0"
+u1680="\xE1\x9A\x80"
+u2000="\xE2\x80\x80"
+u2001="\xE2\x80\x81"
+u2002="\xE2\x80\x82"
+u2009="\xE2\x80\x89"
+u200A="\xE2\x80\x8A"
+u202F="\xE2\x80\xAF"
+u205F="\xE2\x81\x9F"
+u3000="\xE3\x80\x80"
+u2028="\xE2\x80\xA8"
+u2029="\xE2\x80\xA9"
+u0009="\x09"
+u000A="\x0A"
+
+# join controls (refused) and invisibles
+u200C="\xE2\x80\x8C"
+u200D="\xE2\x80\x8D"
+u200B="\xE2\x80\x8B"
+u2060="\xE2\x81\xA0"
+uFEFF="\xEF\xBB\xBF"
+u00AD="\xC2\xAD"
+u180E="\xE1\xA0\x8E"
+uFE0F="\xEF\xB8\x8F"
+uE0041="\xF3\xA0\x81\x81"
+u202E="\xE2\x80\xAE"
+u2066="\xE2\x81\xA6"
+
+# CONTEXTO code points (allowed here) and RFC 5892 DISALLOWED exceptions
+u00B7="\xC2\xB7"
+u0375="\xCD\xB5"
+u05F3="\xD7\xB3"
+u05F4="\xD7\xB4"
+u30FB="\xE3\x83\xBB"
+u0660="\xD9\xA0"
+u0669="\xD9\xA9"
+u06F0="\xDB\xB0"
+u06F9="\xDB\xB9"
+u0640="\xD9\x80"
+u07FA="\xDF\xBA"
+u302E="\xE3\x80\xAE"
+u302F="\xE3\x80\xAF"
+u3031="\xE3\x80\xB1"
+u303B="\xE3\x80\xBB"
+
+# combining marks: ccc 220/230 for reordering, Indic virama, Hebrew point
+u0300="\xCC\x80"
+u0301="\xCC\x81"
+u0302="\xCC\x82"
+u0323="\xCC\xA3"
+u0327="\xCC\xA7"
+u094D="\xE0\xA5\x8D"
+u05B7="\xD6\xB7"
+u0654="\xD9\x94"
+
+# composition and singleton decompositions
+u00E9="\xC3\xA9"
+u212B="\xE2\x84\xAB"
+u00C5="\xC3\x85"
+u2126="\xE2\x84\xA6"
+uFB01="\xEF\xAC\x81"
+uFF41="\xEF\xBD\x81"
+u2163="\xE2\x85\xA3"
+u1E9E="\xE1\xBA\x9E"
+u00DF="\xC3\x9F"
+u03C2="\xCF\x82"
+
+# Hangul: precomposed, modern jamo that compose, old jamo
+uAC00="\xEA\xB0\x80"
+u1100="\xE1\x84\x80"
+u1161="\xE1\x85\xA1"
+u11A8="\xE1\x86\xA8"
+u1113="\xE1\x84\x93"
+u1160="\xE1\x85\xA0"
+
+# the NFC baseline: the canary (12.0) and marks newer than it
+u0EBA="\xE0\xBA\xBA"
+u1ABF="\xE1\xAA\xBF"
+u11938="\xF0\x91\xA4\xB8"
+u11935="\xF0\x91\xA4\xB5"
+u11930="\xF0\x91\xA4\xB0"
+
+# noncharacters, private use, unassigned, controls
+uFDD0="\xEF\xB7\x90"
+uFFFF="\xEF\xBF\xBF"
+uE000="\xEE\x80\x80"
+uF0000="\xF3\xB0\x80\x80"
+u0378="\xCD\xB8"
+u007F="\x7F"
+u0085="\xC2\x85"
+
+# emoji and symbols
+u1F600="\xF0\x9F\x98\x80"
+u2666="\xE2\x99\xA6"
+u20AC="\xE2\x82\xAC"

@@ -1,0 +1,46 @@
+{
+  "description": "Shared acceptance corpus for opaque-string: run by tests/corpus.rs (native) and crates/opaque-string-wasm/tests/npm.test.mjs (wasm, engine NFC). prepare is the expected prepared form; enforce is {ok} with the prepared form, {reason: \"empty\"}, or the first refused code point with its index in the prepared form (code points) and the number refused.",
+  "unicode": "17.0.0",
+  "nfc_baseline": "12.0",
+  "cases": [
+    { "name": "spaces allowed", "source": "RFC 8265 §4.3 #12", "input": "correct horse battery staple", "prepare": "correct horse battery staple", "enforce": { "ok": "correct horse battery staple" } },
+    { "name": "case preserved", "source": "RFC 8265 §4.3 #13", "input": "Correct Horse Battery Staple", "prepare": "Correct Horse Battery Staple", "enforce": { "ok": "Correct Horse Battery Staple" } },
+    { "name": "non-ASCII letters", "source": "RFC 8265 §4.3 #14", "input": "πßå", "prepare": "πßå", "enforce": { "ok": "πßå" } },
+    { "name": "symbols", "source": "RFC 8265 §4.3 #15", "input": "Jack of ♦s", "prepare": "Jack of ♦s", "enforce": { "ok": "Jack of ♦s" } },
+    { "name": "ogham space mark mapped", "source": "RFC 8265 §4.3 #16", "input": "foo bar", "prepare": "foo bar", "enforce": { "ok": "foo bar" } },
+    { "name": "empty", "source": "RFC 8265 §4.3 #17", "input": "", "prepare": "", "enforce": { "reason": "empty" } },
+    { "name": "tab refused", "source": "RFC 8265 §4.3 #18", "input": "my cat is a \tby", "prepare": "my cat is a \tby", "enforce": { "reason": "control", "code_point": "U+0009", "index": 12, "count": 1 } },
+
+    { "name": "ZWJ after virama", "source": "deviation: CONTEXTJ refused (RFC allows it)", "input": "क्‍", "prepare": "क्‍", "enforce": { "reason": "join_control", "code_point": "U+200D", "index": 2, "count": 1 } },
+    { "name": "Persian ZWNJ", "source": "deviation: CONTEXTJ refused (RFC allows it)", "input": "می‌رود", "prepare": "می‌رود", "enforce": { "reason": "join_control", "code_point": "U+200C", "index": 2, "count": 1 } },
+    { "name": "middle dot outside l.l", "source": "deviation: CONTEXTO allowed (RFC refuses)", "input": "a·b", "prepare": "a·b", "enforce": { "ok": "a·b" } },
+    { "name": "katakana middle dot outside kana", "source": "deviation: CONTEXTO allowed (RFC refuses)", "input": "a・b", "prepare": "a・b", "enforce": { "ok": "a・b" } },
+    { "name": "mixed Arabic-Indic digit sets", "source": "deviation: CONTEXTO allowed (RFC refuses)", "input": "١۲", "prepare": "١۲", "enforce": { "ok": "١۲" } },
+    { "name": "Hangul syllable typed as jamo", "source": "deviation: class checked on the prepared form (RFC refuses the jamo)", "input": "가", "prepare": "가", "enforce": { "ok": "가" } },
+    { "name": "mark newer than the baseline", "source": "deviation: NFC baseline (Unicode 13.0 U+1ABF)", "input": "aᪿ", "prepare": "aᪿ", "enforce": { "reason": "unstable_normalization", "code_point": "U+1ABF", "index": 1, "count": 1 } },
+    { "name": "canary", "source": "the baseline's own mark composes", "input": "á຺", "prepare": "á຺", "enforce": { "ok": "á຺" } },
+
+    { "name": "decomposed accent", "source": "NFC", "input": "é", "prepare": "é", "enforce": { "ok": "é" } },
+    { "name": "angstrom sign", "source": "NFC singleton", "input": "Å", "prepare": "Å", "enforce": { "ok": "Å" } },
+    { "name": "marks reordered then composed", "source": "NFC canonical ordering", "input": "ậ", "prepare": "ậ", "enforce": { "ok": "ậ" } },
+    { "name": "fullwidth kept", "source": "RFC 8265 §4.2.2 rule 1: no width mapping", "input": "ａｂ", "prepare": "ａｂ", "enforce": { "ok": "ａｂ" } },
+    { "name": "compatibility kept", "source": "NFC, not NFKC", "input": "Ⅳﬁ", "prepare": "Ⅳﬁ", "enforce": { "ok": "Ⅳﬁ" } },
+    { "name": "sharp s and final sigma", "source": "RFC 5892 Exceptions PVALID", "input": "Straße ς", "prepare": "Straße ς", "enforce": { "ok": "Straße ς" } },
+    { "name": "emoji", "source": "Symbols (O)", "input": "😀 pass", "prepare": "😀 pass", "enforce": { "ok": "😀 pass" } },
+    { "name": "ideographic space", "source": "space map", "input": "　", "prepare": " ", "enforce": { "ok": " " } },
+    { "name": "en quad mapped before NFC", "source": "space map precedes NFC (NFC alone gives U+2002)", "input": "a b", "prepare": "a b", "enforce": { "ok": "a b" } },
+    { "name": "no-break space", "source": "space map", "input": "pass word", "prepare": "pass word", "enforce": { "ok": "pass word" } },
+
+    { "name": "tatweel", "source": "RFC 5892 Exceptions DISALLOWED", "input": "بـب", "prepare": "بـب", "enforce": { "reason": "exception", "code_point": "U+0640", "index": 1, "count": 1 } },
+    { "name": "Hangul tone mark", "source": "RFC 5892 Exceptions DISALLOWED", "input": "〮", "prepare": "〮", "enforce": { "reason": "exception", "code_point": "U+302E", "index": 0, "count": 1 } },
+    { "name": "noncharacter", "source": "PrecisIgnorableProperties (M)", "input": "a﷐", "prepare": "a﷐", "enforce": { "reason": "ignorable", "code_point": "U+FDD0", "index": 1, "count": 1 } },
+    { "name": "zero width space", "source": "PrecisIgnorableProperties (M)", "input": "pass​word", "prepare": "pass​word", "enforce": { "reason": "ignorable", "code_point": "U+200B", "index": 4, "count": 1 } },
+    { "name": "Mongolian vowel separator", "source": "PrecisIgnorableProperties (M)", "input": "a᠎b", "prepare": "a᠎b", "enforce": { "reason": "ignorable", "code_point": "U+180E", "index": 1, "count": 1 } },
+    { "name": "tag character", "source": "PrecisIgnorableProperties (M)", "input": "a󠁁", "prepare": "a󠁁", "enforce": { "reason": "ignorable", "code_point": "U+E0041", "index": 1, "count": 1 } },
+    { "name": "old Hangul jamo", "source": "OldHangulJamo (I)", "input": "ᄓᅡ", "prepare": "ᄓᅡ", "enforce": { "reason": "old_hangul_jamo", "code_point": "U+1113", "index": 0, "count": 2 } },
+    { "name": "private use", "source": "RFC 8264 §8 Else", "input": "a", "prepare": "a", "enforce": { "reason": "disallowed", "code_point": "U+E000", "index": 1, "count": 1 } },
+    { "name": "line separator not mapped", "source": "RFC 8264 §8 Else (Zl is not Zs)", "input": "a b", "prepare": "a b", "enforce": { "reason": "disallowed", "code_point": "U+2028", "index": 1, "count": 1 } },
+    { "name": "unassigned", "source": "Unassigned (J)", "input": "a͸", "prepare": "a͸", "enforce": { "reason": "unassigned", "code_point": "U+0378", "index": 1, "count": 1 } },
+    { "name": "several refused", "source": "count and first", "input": "\t​\t", "prepare": "\t​\t", "enforce": { "reason": "control", "code_point": "U+0009", "index": 0, "count": 3 } }
+  ]
+}

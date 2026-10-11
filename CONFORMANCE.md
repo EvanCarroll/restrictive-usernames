@@ -49,6 +49,10 @@ use only code points that are assigned there.
 | Leading combining mark | refused per word | Stricter (an addition) |
 | UAX #31 identifier start | General Category L* only | Stricter |
 | Case folding | full C+F, not toLowerCase | Stricter |
+| RFC 8265 OpaqueString (`opaque-string`) CONTEXTJ | refused | Stricter |
+| RFC 8265 OpaqueString CONTEXTO | no context rule | More liberal |
+| RFC 8265 OpaqueString preparation | class checked on the prepared form, not the input | More liberal |
+| RFC 8265 OpaqueString, code points newer than Unicode 12.0 | 145 NFC-unstable ones refused | Stricter |
 
 ## 1. PRECIS framework (RFC 8264)
 
@@ -200,12 +204,11 @@ refuses mostly trailing punctuation and mixed digit classes. The other
 option is to also index `key_visual_ci` / `key_visual_cs` on username
 columns.
 
-### 2.4 OpaqueString: not implemented
+### 2.4 OpaqueString: the `opaque-string` crate
 
-RFC 8265 §4 also defines OpaqueString, for passwords: FreeformClass,
-non-ASCII spaces mapped to U+0020, no width or case mapping, NFC, no Bidi
-Rule. This project has no password function. [PASSWORDS.md](PASSWORDS.md)
-covers where one would run and why it would be a separate crate.
+RFC 8265 §4.2 also defines OpaqueString, for passwords. It is implemented
+by a separate crate, `opaque-string`, versioned on its own; §8 covers it.
+[PASSWORDS.md](PASSWORDS.md) explains why it is separate.
 
 ## 3. Nicknames vs RFC 8266
 
@@ -439,3 +442,60 @@ from Unicode 6.3.0. This project's tables come from Unicode 16.0 to 18.0
 (README, "Unicode versions"). Code points assigned after 6.3.0 are
 classified only by this project. Every other difference in this document
 holds at any common version.
+
+## 8. OpaqueString (`opaque-string` crate)
+
+`crates/opaque-string` implements RFC 8265 §4.2: FreeformClass (RFC 8264
+§4.3) as the base, non-ASCII spaces (Zs) mapped to U+0020, no width or case
+mapping, NFC, no Bidi Rule, and a non-empty result. The class is derived
+from UCD 17.0.0 by applying RFC 8264 §8 in its fixed order, with the
+RFC 5892 §2.6 Exceptions, including their DISALLOWED entries such as
+U+0640 ARABIC TATWEEL (`tablegen/`, checked in CI). A differential test
+against `precis-profiles` 0.2, an independent implementation with Unicode
+6.3.0 tables, agrees on every code point assigned in 6.3.0 except the
+CONTEXTO ones below.
+
+It splits the RFC's single enforcement into two functions:
+
+* `enforce`, for registration and password change, is the RFC's
+  enforcement with the deviations below.
+* `prepare`, for login, applies only the mapping and NFC and refuses
+  nothing. Its output equals `enforce`'s for every password `enforce`
+  accepts. Refusing at login would lock out a password that was valid when
+  it was set, if a later release refuses more. This is not RFC
+  "preparation" (RFC 8264 §6), which checks the class.
+
+Deviations:
+
+* **CONTEXTJ: stricter.** ZWJ and ZWNJ are refused everywhere, as in the
+  username profiles (§1.3), so `क्‍` (ZWJ after a virama) and Persian
+  `می‌رود` are refused. The RFC accepts them.
+* **CONTEXTO: more liberal.** U+00B7, U+0375, U+05F3, U+05F4, U+30FB and
+  both Arabic-Indic digit sets are allowed without their RFC 5892 context
+  rules (`a·b`, `a・b`, `١۲`). Those rules stop look-alike *displayed*
+  strings; a password is never displayed.
+* **Class checked on the prepared form: more liberal.** RFC 8265 checks
+  FreeformClass on the input before NFC. Here it is checked on the output,
+  so `enforce(prepare(x))` and `enforce(x)` agree. The one visible effect:
+  a modern Hangul syllable typed as conjoining jamo (`U+1100 U+1161`) is
+  accepted as `가`, where the RFC refuses the jamo.
+* **NFC baseline: stricter.** Code points newer than Unicode 12.0 that NFC
+  treats differently on an engine that does not know them are refused, as
+  `unstable_normalization`. That means a non-zero combining class, a
+  canonical decomposition, or being part of one. There are 145 for
+  Unicode 17.0, mostly combining marks of recent scripts. NFC is stable
+  for assigned code points, and an engine treats a code point it does not
+  know as a starter without a decomposition, which is correct for every
+  other code point. So with these refused, two engines whose Unicode
+  versions are both at least 12.0 produce the same bytes for every
+  accepted password.
+* **Rules applied once.** RFC 8266 asks nickname implementations to repeat
+  the rules until stable; RFC 8265 does not, and here the mapping and NFC
+  are idempotent (tested exhaustively), so once is enough.
+
+On wasm32 the `js` backend takes NFC from the JavaScript engine
+(`String.prototype.normalize`). A canary (U+0EBA, Unicode 12.0, ccc 9)
+refuses engines older than the baseline. CI compares Node's NFC with the
+compiled-in tables on every accepted code point, alone and in combining
+contexts.
+

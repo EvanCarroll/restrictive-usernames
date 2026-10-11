@@ -1,0 +1,138 @@
+# opaque-string: the RFC 8265 OpaqueString crate and its npm package.
+# Called by ci.yaml on every push and pull request, and by
+# release-opaque-string.yaml against the tagged commit.
+name: opaque-string
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    env:
+      RUSTFLAGS: -D warnings
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup target add wasm32-unknown-unknown
+      - name: rustfmt (crates outside the workspace)
+        run: |
+          cargo fmt --manifest-path crates/opaque-string/fuzz/Cargo.toml --check
+          cargo fmt --manifest-path crates/opaque-string/tablegen/Cargo.toml --check
+      - name: clippy
+        run: |
+          cargo clippy -p opaque-string --all-targets --all-features
+          cargo clippy -p opaque-string --all-targets --no-default-features
+          cargo clippy -p opaque-string-wasm --all-targets --all-features
+          cargo clippy -p opaque-string-wasm --target wasm32-unknown-unknown
+          cargo clippy --manifest-path crates/opaque-string/tablegen/Cargo.toml
+      - name: rustdoc
+        run: cargo doc -p opaque-string --no-deps
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal
+      # Includes the exhaustive tests and the differential against
+      # precis-profiles; release keeps them to a few seconds.
+      - name: Test with compiled-in NFC
+        run: cargo test -p opaque-string --release
+      - name: Test without a backend
+        run: cargo test -p opaque-string --no-default-features
+      - name: Test the wasm bindings on the host
+        run: cargo test -p opaque-string-wasm
+      - name: Fuzz properties over the corpus
+        run: cargo test --manifest-path crates/opaque-string/fuzz/Cargo.toml
+      - name: Package as crates.io would
+        run: cargo publish -p opaque-string --dry-run
+
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: rustup toolchain install 1.85 --profile minimal
+      - name: Test on the minimum supported Rust
+        run: |
+          cargo +1.85 test -p opaque-string --release
+          cargo +1.85 test -p opaque-string --no-default-features
+
+  # The committed table is exactly what the generator makes from the
+  # checksummed UCD files.
+  tables:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Regenerate and compare src/tables.rs
+        run: crates/opaque-string/tablegen/regen.sh --check
+
+  npm:
+    runs-on: ubuntu-24.04
+    env:
+      BINARYEN_VERSION: "133"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Toolchain, wasm-bindgen CLI, wasm-opt
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-unknown-unknown
+          # The CLI must equal the wasm-bindgen crate (build-npm.sh checks).
+          v=$(cargo metadata --format-version 1 | jq -er '[.packages[] | select(.name == "wasm-bindgen") | .version] | unique | .[0]')
+          cargo install wasm-bindgen-cli --locked --version "$v"
+          curl -fsSL --retry 3 \
+            "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/binaryen-version_${BINARYEN_VERSION}/bin" >> "$GITHUB_PATH"
+      # Size budget, the shared corpus, and the engine's NFC against the
+      # compiled-in tables on every accepted code point.
+      - name: Build, test and pack
+        run: crates/opaque-string-wasm/build-npm.sh --test --pack
+      # Not "npm": ci.yaml uploads that name in the same run.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm-opaque-string
+          path: target/npm/opaque-string/
+
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Nightly toolchain and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install --locked cargo-fuzz
+      - name: Seed the corpus
+        working-directory: crates/opaque-string/fuzz
+        run: cargo test -- --ignored write_seed_corpus
+      - name: Fuzz each target for 60 seconds
+        working-directory: crates/opaque-string
+        run: |
+          set -euo pipefail
+          for target in $(cargo +nightly fuzz list); do
+            cargo +nightly fuzz run "$target" -- \
+              -dict=fuzz/opaque.dict -max_len=256 -max_total_time=60
+          done
+      - name: Upload crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-artifacts-opaque-string
+          path: crates/opaque-string/fuzz/artifacts/

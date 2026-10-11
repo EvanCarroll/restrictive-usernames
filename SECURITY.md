@@ -13,6 +13,17 @@ on it, even when nothing crashes. Report privately any of these:
 * a panic, hang or unbounded memory use on any input (each one is a
   PostgreSQL `ERROR` or a stalled backend in the extension).
 
+For the password crate `opaque-string`, report privately:
+
+* a password `enforce` accepts for which `prepare` gives different bytes
+  on two platforms or backends (native tables, a JavaScript engine that
+  passes `engineSupported()`), or in a later release;
+* `prepare` not being idempotent, or `enforce` accepting a code point the
+  profile refuses;
+* an error message, `Debug` output or log line that contains the
+  password;
+* a panic, hang or unbounded memory use on any input.
+
 Behaviour already listed in [CONFORMANCE.md](CONFORMANCE.md) or under
 "Known limitations" in the README is a known gap, not a vulnerability;
 issues and pull requests about it are welcome in public.
@@ -31,5 +42,6 @@ will say which indexes to rebuild (UPGRADING.md).
 
 ## Supported versions
 
-Only the latest release gets fixes. Each fix ships as a new release with
+Only the latest release of each crate (`restrictive-usernames`,
+`opaque-string`) gets fixes. Each fix ships as a new release with
 upgrade notes, never as a patch to an old policy version.
