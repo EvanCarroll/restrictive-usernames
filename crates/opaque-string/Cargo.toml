@@ -2,7 +2,7 @@
 name = "opaque-string"
 # Versioned independently of the workspace: released from opaque-string-v*
 # tags (release-opaque-string.yaml), never with restrictive-usernames.
-version = "0.1.0"
+version = "0.1.1"
 description = "RFC 8265 OpaqueString, the PRECIS password profile: the same password always becomes the same bytes before OPAQUE or a password hash"
 license = "MIT"
 edition.workspace = true
@@ -12,7 +12,7 @@ homepage.workspace = true
 documentation = "https://docs.rs/opaque-string"
 readme = "README.md"
 keywords = ["password", "precis", "rfc8265", "unicode", "normalization"]
-categories = ["authentication", "text-processing", "internationalization"]
+categories = ["authentication", "text-processing", "internationalization", "no-std"]
 rust-version = "1.85"
 exclude = ["fuzz/", "tablegen/"]
 
@@ -26,15 +26,15 @@ nfc-tables = ["dep:unicode-normalization"]
 js = ["dep:js-sys"]
 
 [dependencies]
-thiserror = "2"
+thiserror = { version = "2", default-features = false }
 zeroize = { version = "1.9", default-features = false, features = ["alloc"] }
 # Exact: src/tables.rs is generated for this crate's Unicode version
 # (17.0.0), and a compile-time assertion in lib.rs refuses any other. The
 # workspace shares this pin with restrictive-usernames.
-unicode-normalization = { version = "=0.1.25", optional = true }
+unicode-normalization = { version = "=0.1.25", default-features = false, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-js-sys = { version = "0.3.106", optional = true }
+js-sys = { version = "0.3.106", default-features = false, optional = true }
 
 [dev-dependencies]
 serde_json = "1"

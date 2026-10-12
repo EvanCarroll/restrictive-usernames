@@ -4,6 +4,13 @@ opaque-string is versioned independently of restrictive-usernames and is
 released from `opaque-string-v<version>` tags. Each entry names the Unicode
 version of the refusal table and the NFC baseline.
 
+## 0.1.1 (Unicode 17.0.0, NFC baseline 12.0)
+
+* `no_std` (needs `alloc`), with both backends. No API or output change:
+  `thiserror`, `unicode-normalization` and `js-sys` are used without their
+  `std` features, and `Refused` implements `core::error::Error`, which is
+  `std::error::Error`.
+
 ## 0.1.0 (Unicode 17.0.0, NFC baseline 12.0): first release
 
 * `enforce` (registration) and `prepare` (login): RFC 8265 §4.2

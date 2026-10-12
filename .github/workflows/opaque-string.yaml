@@ -58,6 +58,22 @@ jobs:
       - name: Package as crates.io would
         run: cargo publish -p opaque-string --dry-run
 
+  # A target without std: an accidental std import breaks this, not a user.
+  no-std:
+    runs-on: ubuntu-24.04
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add thumbv7em-none-eabihf
+      - name: Check without std
+        run: |
+          cargo check -p opaque-string --target thumbv7em-none-eabihf --no-default-features --features nfc-tables
+          cargo check -p opaque-string --target thumbv7em-none-eabihf --no-default-features
+
   msrv:
     runs-on: ubuntu-24.04
     steps:

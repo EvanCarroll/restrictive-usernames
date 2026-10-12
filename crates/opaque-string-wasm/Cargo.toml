@@ -3,7 +3,7 @@ name = "opaque-string-wasm"
 description = "JavaScript bindings (wasm-bindgen) for opaque-string, published to npm as opaque-string"
 license = "MIT"
 # Must equal opaque-string's version (build-npm.sh checks).
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true

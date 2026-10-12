@@ -1,5 +1,6 @@
 //! The prepared password.
 
+use alloc::string::String;
 use core::fmt;
 
 use zeroize::Zeroize;

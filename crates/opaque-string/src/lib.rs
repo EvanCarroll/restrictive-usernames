@@ -59,6 +59,14 @@
 //!   [`prepare`].
 //!
 //! Without a backend only [`refusal`] and the vocabulary are available.
+//!
+//! The crate is `no_std` and needs `alloc`.
+
+#![no_std]
+
+extern crate alloc;
+#[cfg(test)]
+extern crate std;
 
 mod error;
 mod prepared;
@@ -117,6 +125,7 @@ const _: () = {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{format, vec::Vec};
 
     #[test]
     fn version_constants_match_the_table() {

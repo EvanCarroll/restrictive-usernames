@@ -70,6 +70,8 @@ has the details. In brief:
   Unicode 12.0: `enforce` returns `Refused::UnsupportedEngine` otherwise,
   and `engine_supported()` says so in advance.
 
+Both backends are `no_std`; the crate needs `alloc`.
+
 ```toml
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 opaque-string = { version = "0.1", default-features = false, features = ["js"] }

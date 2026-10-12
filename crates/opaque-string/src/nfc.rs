@@ -1,5 +1,7 @@
 //! The NFC backends: compiled-in tables, or the JavaScript engine.
 
+use alloc::string::String;
+
 use crate::space::map_space;
 
 /// The prepared form: spaces mapped, then NFC.
