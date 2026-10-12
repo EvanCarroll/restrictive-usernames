@@ -62,13 +62,16 @@ pub fn enforce_properties(password: &str) {
         }
         Err(other) => panic!("unexpected refusal {other:?}"),
     }
-    // The error text names code points as U+XXXX; it must not carry the
-    // password itself.
-    if let Err(e) = &result
-        && password.chars().count() >= 8
-    {
-        assert!(!e.to_string().contains(password));
-        assert!(!format!("{e:?}").contains(password));
+    // The error carries no password text: with every accepted code point replaced by '0' (no NFC composition), it is identical.
+    if let Err(e) = &result {
+        let masked: String = prepared
+            .as_str()
+            .chars()
+            .map(|c| if refusal(c).is_some() { c } else { '0' })
+            .collect();
+        let masked_err = enforce(&masked).expect_err("the refused code points are still there");
+        assert_eq!(e.to_string(), masked_err.to_string());
+        assert_eq!(format!("{e:?}"), format!("{masked_err:?}"));
     }
 }
 
@@ -87,6 +90,12 @@ mod tests {
             .iter()
             .map(|c| c["input"].as_str().unwrap().to_owned())
             .collect()
+    }
+
+    /// Fuzz find: a "password" that is a fragment of its own error's Debug text.
+    #[test]
+    fn password_spelling_its_own_error() {
+        enforce_properties("_point: 'ـ', reaso");
     }
 
     #[test]
