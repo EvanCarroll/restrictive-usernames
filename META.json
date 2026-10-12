@@ -2,7 +2,7 @@
    "name": "pg_restrictive_usernames",
    "abstract": "Unicode username, nickname and label policy and confusable-skeleton keys for unique indexes",
    "description": "Validates usernames, nicknames and labels against the UTS #39 identifier profile with Highly Restrictive script mixing, refuses Zalgo stacks and compatibility look-alikes, and computes UTS #39 confusable skeletons, in stored and in UAX #9 display order, for unique expression indexes. Every function is IMMUTABLE STRICT PARALLEL SAFE. The same Rust library is usable from the application. Built with pgrx (cargo pgrx install).",
-   "version": "0.5.0",
+   "version": "0.5.1",
    "maintainer": [
       "Evan Carroll <me@evancarroll.com>"
    ],
@@ -15,7 +15,7 @@
          "abstract": "Unicode username, nickname and label policy and confusable-skeleton keys",
          "file": "crates/pg_restrictive_usernames/pg_restrictive_usernames.control",
          "docfile": "README.md",
-         "version": "0.5.0"
+         "version": "0.5.1"
       }
    },
    "prereqs": {

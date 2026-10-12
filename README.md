@@ -515,7 +515,7 @@ Release images are signed with cosign (keyless, GitHub OIDC) and carry an
 SPDX SBOM attestation:
 
 ```sh
-cosign verify ghcr.io/evancarroll/pg-restrictive-usernames:0.5.0-pg18 \
+cosign verify ghcr.io/evancarroll/pg-restrictive-usernames:0.5.1-pg18 \
     --certificate-identity-regexp '^https://github.com/EvanCarroll/restrictive-usernames/' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
@@ -529,7 +529,7 @@ headers of PostgreSQL 14 to 18 (`postgresql-server-dev-NN`, `pg_config` on
 `PATH`) and clang:
 
 ```sh
-unzip pg_restrictive_usernames-0.5.0.zip && cd pg_restrictive_usernames-0.5.0
+unzip pg_restrictive_usernames-0.5.1.zip && cd pg_restrictive_usernames-0.5.1
 cargo install --locked cargo-pgrx@0.19.3     # must equal the resolved pgrx version
 cargo pgrx init --pg18 "$(which pg_config)"
 cd crates/pg_restrictive_usernames
@@ -537,8 +537,8 @@ cargo pgrx install --release --pg-config "$(which pg_config)" --no-default-featu
 ```
 
 or, with buildah, `PG_MAJOR=18 container/build-extension.sh` from the
-unpacked tree. Maintainers: `container/pgxn-bundle.sh v0.5.0` writes
-`out/pg_restrictive_usernames-0.5.0.zip` from the tag, after checking that
+unpacked tree. Maintainers: `container/pgxn-bundle.sh v0.5.1` writes
+`out/pg_restrictive_usernames-0.5.1.zip` from the tag, after checking that
 `META.json` and the workspace agree on the version.
 
 ### CI and releases

@@ -62,6 +62,11 @@ Per deployment, in this order:
 Skipping step 5 leaves indexes whose stored keys disagree with the function,
 which silently breaks uniqueness and lookups.
 
+## 0.5.0 → 0.5.1 (policy 5)
+
+* SQL: none (`pg_restrictive_usernames--0.5.0--0.5.1.sql` is empty except
+  for its guard). Policy unchanged; no `REINDEX`.
+
 ## 0.4.0 → 0.5.0 (policy 4 → 5)
 
 * SQL: none (`pg_restrictive_usernames--0.4.0--0.5.0.sql` is empty except

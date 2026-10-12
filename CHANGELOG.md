@@ -8,6 +8,14 @@ independently. A policy bump means the REINDEX procedure in
 The password crate `opaque-string` is versioned and released separately;
 see [crates/opaque-string/CHANGELOG.md](crates/opaque-string/CHANGELOG.md).
 
+## 0.5.1 (policy 5)
+
+### Changed
+
+* `unicode-ident` 1.0.26 → 1.0.27 (still Unicode 18.0.0). Its tables are
+  only re-laid out: `is_xid_start` and `is_xid_continue` agree on every
+  code point, so no check result or key changes and no `REINDEX` is needed.
+
 ## 0.5.0 (policy 5): first public release
 
 ### Fixed

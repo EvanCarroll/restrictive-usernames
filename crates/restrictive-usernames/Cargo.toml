@@ -45,7 +45,7 @@ thiserror = "2"
 unicode-security = { version = "=0.1.2", optional = true }
 unicode-normalization = { version = "=0.1.25", optional = true }
 unicode-script = { version = "=0.5.8", optional = true }
-unicode-ident = { version = "=1.0.26", optional = true }
+unicode-ident = { version = "=1.0.27", optional = true }
 caseless = { version = "=0.2.2", optional = true }
 unicode-bidi = { version = "=0.3.18", optional = true }
 
